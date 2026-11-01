@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+env:
+  CARGO_TERM_COLOR: always
+  RUSTLINGS_VERSION: "6.5.0"
+
 jobs:
   test:
     name: Test completed exercises
@@ -19,35 +23,64 @@ jobs:
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+      
+      - name: Cache rustlings binary
+        id: cache-rustlings
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/rustlings
+          key: rustlings-bin-${{ runner.os }}-${{ env.RUSTLINGS_VERSION }}
 
       - name: Install Rustlings
-        run: cargo install rustlings --locked
+        if: steps.cache-rustlings.outputs.cache-hit != 'true'
+        run: cargo install rustlings --version "$RUSTLINGS_VERSION" --locked
 
-      
+      - name: Cache exercise build output
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: rustlings-target-${{ runner.os }}-${{ hashFiles('exercises/**/*.rs', 'Cargo.toml', 'Cargo.lock') }}
+          restore-keys: |
+            rustlings-target-${{ runner.os }}-
+
       - name: Verify completed exercises
         shell: bash
         run: |
           set -euo pipefail
-
           file=".rustlings-state.txt"
-
           if [[ ! -f "$file" ]]; then
             echo "::error::File $file not found"
             exit 1
           fi
 
-          while IFS= read -r exercise || [[ -n "$exercise" ]]; do
-            # remove blank lines 
+          current_skipped=false
+          failed=()
+
+          # Read the file on fd 3 so commands inside the loop can't consume it
+          while IFS= read -r exercise <&3 || [[ -n "$exercise" ]]; do
             exercise="${exercise//$'\r'/}"
             exercise="${exercise#"${exercise%%[![:space:]]*}"}"
             exercise="${exercise%"${exercise##*[![:space:]]}"}"
 
-            # skip the useless line 
             [[ -z "$exercise" ]] && continue
             [[ "$exercise" == "DON'T EDIT THIS FILE!"* ]] && continue
 
-            echo "::group::Testing $exercise"
-            rustlings run "$exercise"
-            echo "::endgroup::"
-          done < "$file"
+            # First exercise name is the current (unfinished) one: skip it
+            if [[ "$current_skipped" == false ]]; then
+              echo "Skipping current exercise: $exercise"
+              current_skipped=true
+              continue
+            fi
 
+            echo "::group::Testing $exercise"
+            if ! rustlings run "$exercise" < /dev/null; then
+              echo "::error::Exercise $exercise failed"
+              failed+=("$exercise")
+            fi
+            echo "::endgroup::"
+          done 3< "$file"
+
+          if (( ${#failed[@]} > 0 )); then
+            echo "::error::Failed exercises: ${failed[*]}"
+            exit 1
+          fi
