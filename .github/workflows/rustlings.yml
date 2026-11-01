@@ -23,18 +23,29 @@ jobs:
       - name: Install Rustlings
         run: cargo install rustlings --locked
 
+      
       - name: Verify completed exercises
         shell: bash
         run: |
           set -euo pipefail
 
+          file=".rustlings-state.txt"
+
+          if [[ ! -f "$file" ]]; then
+            echo "::error::File $file not found"
+            exit 1
+          fi
+
           while IFS= read -r exercise || [[ -n "$exercise" ]]; do
-            exercise="${exercise%%#*}"
+            # remove blank lines 
             exercise="$(echo "$exercise" | xargs)"
 
+            # skip the useless line 
             [[ -z "$exercise" ]] && continue
+            [[ "$exercise" == "DON'T EDIT THIS FILE!"* ]] && continue
 
             echo "::group::Testing $exercise"
             rustlings run "$exercise"
             echo "::endgroup::"
-          done < .github/completed-exercises.txt
+          done < "$file"
+
