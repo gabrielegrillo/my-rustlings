@@ -38,6 +38,7 @@ jobs:
 
           while IFS= read -r exercise || [[ -n "$exercise" ]]; do
             # remove blank lines 
+            exercise="${exercise//$'\r'/}"
             exercise="${exercise#"${exercise%%[![:space:]]*}"}"
             exercise="${exercise%"${exercise##*[![:space:]]}"}"
 
