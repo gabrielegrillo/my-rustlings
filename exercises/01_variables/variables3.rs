@@ -1,7 +1,7 @@
 fn main() {
     // TODO: Change the line below to fix the compiler error.
     let x: i32 = 1;
-    let y = 1;
+    let mut y = 1;
     y = 2;
     println!("Number {x}");
 }
