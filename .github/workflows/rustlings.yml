@@ -1,0 +1,40 @@
+name: Rustlings CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test completed exercises
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Rustlings
+        run: cargo install rustlings --locked
+
+      - name: Verify completed exercises
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          while IFS= read -r exercise || [[ -n "$exercise" ]]; do
+            exercise="${exercise%%#*}"
+            exercise="$(echo "$exercise" | xargs)"
+
+            [[ -z "$exercise" ]] && continue
+
+            echo "::group::Testing $exercise"
+            rustlings run "$exercise"
+            echo "::endgroup::"
+          done < .github/completed-exercises.txt
