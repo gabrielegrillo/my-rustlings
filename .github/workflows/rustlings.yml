@@ -53,11 +53,13 @@ jobs:
             exit 1
           fi
 
+          # Snapshot the state file up front: rustlings rewrites it during `run`
+          mapfile -t lines < "$file"
+
           current_skipped=false
           failed=()
 
-          # Read the file on fd 3 so commands inside the loop can't consume it
-          while IFS= read -r exercise <&3 || [[ -n "$exercise" ]]; do
+          for exercise in "${lines[@]}"; do
             exercise="${exercise//$'\r'/}"
             exercise="${exercise#"${exercise%%[![:space:]]*}"}"
             exercise="${exercise%"${exercise##*[![:space:]]}"}"
@@ -78,7 +80,7 @@ jobs:
               failed+=("$exercise")
             fi
             echo "::endgroup::"
-          done 3< "$file"
+          done
 
           if (( ${#failed[@]} > 0 )); then
             echo "::error::Failed exercises: ${failed[*]}"
